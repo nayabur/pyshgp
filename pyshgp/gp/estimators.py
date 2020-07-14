@@ -56,6 +56,12 @@ class PushEstimator:
     verbose : int, optional
         Indicates if verbose printing should be used during searching.
         Default is 0. Options are 0, 1, or 2.
+    penalize_constant_outputs: bool, optional
+        Creates an additional penalty for programs that return the same value for every output. Increases the program
+        error value five times to try suppressing these programs during evolution. Default is False.
+    penalize_no_input_instructions: bool, optional
+        Creates an additional penalty for programs with no input instructions. Increases the program
+        error value five times to try suppressing these programs during evolution. Default is False.
     **kwargs
         Arbitrary keyword arguments. Examples of supported arguments are
         `epsilon` (bool or float) when using Lexicase as the selector, and
@@ -77,6 +83,8 @@ class PushEstimator:
                  parallelism: Union[int, bool] = False,
                  push_config: PushConfig = "default",
                  verbose: int = 0,
+                 penalize_constant_outputs: bool = False,
+                 penalize_no_input_instructions: bool = False,
                  **kwargs):
         self._search_name = search
         self.spawner = spawner
@@ -89,6 +97,8 @@ class PushEstimator:
         self.last_str_from_stdout = last_str_from_stdout
         self.parallelism = parallelism
         self.verbose = verbose
+        self.penalize_constant_outputs = penalize_constant_outputs
+        self.penalize_no_input_instructions = penalize_no_input_instructions
         self.ext = kwargs
         set_verbosity(self.verbose)
 
@@ -151,7 +161,9 @@ class PushEstimator:
             if ndx is not None:
                 output_types[ndx] = "stdout"
         self.signature = ProgramSignature(arity=arity, output_stacks=output_types, push_config=self.push_config)
-        self.evaluator = DatasetEvaluator(X, y, interpreter=self.interpreter)
+        self.evaluator = DatasetEvaluator(X, y, penalize_no_input_instruc=self.penalize_no_input_instructions,
+                                          penalize_same_outs=self.penalize_constant_outputs,
+                                          interpreter=self.interpreter)
         self._build_search_algo()
         self.solution = self.search.run()
         if self.search.config.parallel_context is not None:
@@ -193,7 +205,9 @@ class PushEstimator:
         """
         check_is_fitted(self, "solution")
         X, y, arity, y_types = check_X_y(X, y)
-        self.evaluator = DatasetEvaluator(X, y, interpreter=self.interpreter)
+        self.evaluator = DatasetEvaluator(X, y, penalize_no_input_instruc=self.penalize_no_input_instructions,
+                                          penalize_same_outs=self.penalize_constant_outputs,
+                                          interpreter=self.interpreter)
         return self.evaluator.evaluate(self.solution.program)
 
     def save(self, filepath: str):
