@@ -217,12 +217,6 @@ class DatasetEvaluator(Evaluator):
         super().__init__(interpreter, penalty)
         self.penalize_no_input_instructions = penalize_no_input_instruc
         self.penalize_same_outputs = penalize_same_outs
-
-        print()
-        print("HERE I am: penalize_no_input_instructions", self.penalize_no_input_instructions)
-        print("HERE I am: penalize_same_outputs: ", self.penalize_same_outputs)
-        print()
-
         self.X = pd.DataFrame(X)
         self.y = pd.DataFrame(y)
 
