@@ -121,52 +121,6 @@ class Evaluator(ABC):
                 raise ValueError("Unknown expected type for {e}".format(e=expected))
         return np.array(errors)
 
-    def default_error_function_with_penalty(self, actuals, expecteds) -> np.array:
-        """Produce errors of actual program output given expected program output.
-
-        The default error function is intended to be a universal error function
-        for Push programs which only output a subset of the standard data types.
-
-        Parameters
-        ----------
-        actuals : list
-            The values produced by running a Push program on a sequences of cases.
-
-        expecteds: list
-            The ground truth values for the sequence of cases used to produce the actuals.
-
-        Returns
-        -------
-        np.array
-            An array of error values describing the program's performance.
-
-        """
-        # penalize same outputs
-        multiplicand = 1
-        if self.penalize_same_outputs:
-            if len(set(actuals)) == 1:
-                multiplicand = 5
-
-        errors = []
-        for ndx, actual in enumerate(actuals):
-            expected = expecteds[ndx]
-            if actual is Token.no_stack_item:
-                errors.append(self.penalty)
-            elif isinstance(expected, (bool, np.bool_)):
-                errors.append(int(not (bool(actual) == expected)))
-            elif isinstance(expected, (int, np.int64, float, np.float64)):
-                try:
-                    errors.append(abs(float(actual) - expected))
-                except OverflowError:
-                    errors.append(self.penalty)
-            elif isinstance(expected, str):
-                errors.append(damerau_levenshtein_distance(str(actual), expected))
-            elif isinstance(expected, list):
-                errors += list(self.default_error_function(list(actual), expected))
-            else:
-                raise ValueError("Unknown expected type for {e}".format(e=expected))
-        return np.array(errors) * multiplicand
-
     @tap
     @abstractmethod
     def evaluate(self, program: Program) -> np.ndarray:
@@ -191,8 +145,8 @@ class DatasetEvaluator(Evaluator):
 
     def __init__(self,
                  X, y,
-                 penalize_no_input_instruc: bool = False,
-                 penalize_same_outs: bool = False,
+                 penalize_no_input_instructions: bool = False,
+                 penalize_same_outputs: bool = False,
                  interpreter: PushInterpreter = "default",
                  penalty: float = 1e6,
                  ):
@@ -206,6 +160,14 @@ class DatasetEvaluator(Evaluator):
         y : list, array-like, or pandas dataframe.
             The target values. Shape = [n_samples] or [n_samples, n_outputs]
 
+        penalize_same_outputs: bool, optional
+            Creates an additional penalty for programs that return the same value for every output. Increases the
+            program error value five times to try suppressing these programs during evolution. Default is False.
+
+        penalize_no_input_instructions: bool, optional
+            Creates an additional penalty for programs with no input instructions. Increases the program
+            error value five times to try suppressing these programs during evolution. Default is False.
+
         interpreter : PushInterpreter or {"default"}
             The interpreter used to run the push programs.
 
@@ -215,14 +177,8 @@ class DatasetEvaluator(Evaluator):
 
         """
         super().__init__(interpreter, penalty)
-        self.penalize_no_input_instructions = penalize_no_input_instruc
-        self.penalize_same_outputs = penalize_same_outs
-
-        print()
-        print("HERE I am: penalize_no_input_instructions", self.penalize_no_input_instructions)
-        print("HERE I am: penalize_same_outputs: ", self.penalize_same_outputs)
-        print()
-
+        self.penalize_no_input_instructions = penalize_no_input_instructions
+        self.penalize_same_outputs = penalize_same_outputs
         self.X = pd.DataFrame(X)
         self.y = pd.DataFrame(y)
 
@@ -253,17 +209,21 @@ class DatasetEvaluator(Evaluator):
                     has_inputs = True
                     break
             if not has_inputs:
-                multiplicand = 5
+                multiplicand *= 10
 
         errors = []
+        actuals=[]
         for ndx in range(self.X.shape[0]):
             inputs = self.X.iloc[ndx].to_list()
             expected = self.y.iloc[ndx].to_list()
             actual = self.interpreter.run(program, inputs)
-            if self.penalize_same_outputs:
-                errors.append(self.default_error_function_with_penalty(actual, expected))
-            else:
-                errors.append(self.default_error_function(actual, expected))
+            actuals.append(actual)
+            errors.append(self.default_error_function(actual, expected))
+
+        # penalize same constant output
+        if actuals.count(actuals[0]) == len(actuals):
+            multiplicand *= 5
+
         return np.array(errors).flatten() * multiplicand
 
 

@@ -161,8 +161,8 @@ class PushEstimator:
             if ndx is not None:
                 output_types[ndx] = "stdout"
         self.signature = ProgramSignature(arity=arity, output_stacks=output_types, push_config=self.push_config)
-        self.evaluator = DatasetEvaluator(X, y, penalize_no_input_instruc=self.penalize_no_input_instructions,
-                                          penalize_same_outs=self.penalize_constant_outputs,
+        self.evaluator = DatasetEvaluator(X, y, penalize_no_input_instructions=self.penalize_no_input_instructions,
+                                          penalize_same_outputs=self.penalize_constant_outputs,
                                           interpreter=self.interpreter)
         self._build_search_algo()
         self.solution = self.search.run()
@@ -205,8 +205,8 @@ class PushEstimator:
         """
         check_is_fitted(self, "solution")
         X, y, arity, y_types = check_X_y(X, y)
-        self.evaluator = DatasetEvaluator(X, y, penalize_no_input_instruc=self.penalize_no_input_instructions,
-                                          penalize_same_outs=self.penalize_constant_outputs,
+        self.evaluator = DatasetEvaluator(X, y, penalize_no_input_instructions=self.penalize_no_input_instructions,
+                                          penalize_same_outputs=self.penalize_constant_outputs,
                                           interpreter=self.interpreter)
         return self.evaluator.evaluate(self.solution.program)
 
